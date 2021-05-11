@@ -8,7 +8,7 @@ EryNeu package includes code for modeling cellular differentiation using gene ci
 
 ### INSTALLATION/COMPILATION (Unix/Linux)
 
-Enter the directory where the Makefile is. Build the executables using the following commands:
+Commands for building the executables files:
 
 make -e veryclean (optional)
 
