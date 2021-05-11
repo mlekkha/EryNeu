@@ -1,0 +1,233 @@
+# CODE VERSION ######################################################
+
+VERSION = 9.5.4
+
+# executables to make
+
+SERIALFLYEXECS = automa unfold printscore fly_sa scramble calculate_volumes newtonraphson unstable-manifold
+
+# FLAGS FOR -v FOR ALL EXECUTABLES ##################################
+# this passes user and host name, compiler and version to the com-
+# pile so it can be printed in the -v message of each executable
+
+USRFLAG  = -DUSR=\"$(USER)\"
+HOSTFLAG = -DMACHINE=\"$(HOST)\"
+COMPFLAG = -DCOMPILER=\"$(CC)\"
+FLAGFLAG = -DFLAGS=\"optimized\"
+VERSFLAG = -DVERS=\"$(VERSION)\"
+
+VFLAGS = $(USRFLAG) $(HOSTFLAG) $(COMPFLAG) $(FLAGFLAG) $(VERSFLAG) 
+
+# determine OSTYPE. Earlier this was being done by the shell
+# variable OSTYPE which was exported in tcsh but not in bash.
+# This meant that the shell variable was not a reliable
+# indicator of OS type.
+
+OSTYPE := $(shell uname -s)
+
+# same for HOST
+
+HOST := $(shell uname -n)
+
+# default C compiler
+CC = gcc
+
+# make dynamically-linked targets by default
+DOSTATIC = no
+
+# find out about which architecture we're on and set compiler 
+# accordingly. MPI only works in linux.
+
+
+ifeq ($(findstring Linux,$(OSTYPE)),Linux)
+	CC = gcc
+	MPI = on
+else
+	MPI = off
+endif
+
+# To compile static targets
+#
+ifeq ($(DOSTATIC), yes)
+	STATICFLAG = -static
+else
+	STATICFLAG = 
+endif	
+	
+
+
+ifeq ($(OSTYPE),osf1)
+	CC = cc
+endif
+
+# If USEMPI is "no" override OS-based choice
+
+ifeq ($(USEMPI), no)
+	MPI = off
+endif	
+
+# Libs for fortran to C interface (LINPACK)
+	FORTLIBS = -lg2c -lgfortran
+
+# using MPI? Set flags, compiler, executables, and turn off
+# static linking
+
+ifeq ($(MPI), on)	
+	MPIFLAGS = $(CCFLAGS) -DMPI
+	DEBUGFLAGS = $(DEBUGFLAGS) -DMPI
+	PROFILEFLAGS = $(PROFILEFLAGS) -DMPI
+	MPICC = mpicc
+	FLYEXECS = $(SERIALFLYEXECS) fly_sa.mpi
+	STATICFLAG = 
+else	
+	FLYEXECS = $(SERIALFLYEXECS) 
+	MPICC = 
+endif
+
+
+# find the compiler and set corresponding flags
+
+ifeq ($(CC),cc)
+	CCFLAGS = -std1 -fast -DALPHA_DU -DNDEBUG
+	DEBUGFLAGS = -std1 -O0 -g
+	PROFILEFLAGS = -std1 -O2 -g1 -pg
+	LIBS = -lm -ldxml -lgsl -lgslcblas 
+	FLIBS = $(LIBS)
+	KCC = /bin/kcc
+	KFLAGS = -ckapargs=' -scalaropt=3 -optimize=5 -roundoff=3 -arl=4 '
+# uncomment 2 lines below if you don't want kcc
+#	KCC = $(CC)
+#	KFLAGS = $(CCFLAGS)
+endif
+
+ifeq ($(CC),icc)
+# lucas flags for profiling and debugging 2-6-03
+        CCFLAGS = -O3 -xW -ipo 
+# Flags if you want to force icc to use gcc C++ bindings       
+#       CCFLAGS = -O3 -xW -ipo -cxxlib-gcc
+        PRECFLAGS = -mp -prec_div -pc80 
+#       DEBUGFLAGS = -g  -inline_debug_info -O1  -xW -tpp7
+        DEBUGFLAGS = -g  -inline_debug_info -O0
+        PROFILEFLAGS = -prof_dir profile_data -prof_gen -O2 -xW 
+        USEPROFFLAGS = -prof_use -prof_dir profile_data -O3 -xW -ipo -opt_report
+		LIBS = -limf -lgsl -lgslcblas 
+		FLIBS = $(STATICFLAG) $(LIBS)
+		KCC = $(CC)
+		KFLAGS = $(CCFLAGS)
+        export ICC = "yes"
+# environment variables that change openmpi's underlying C
+# compiler
+		OMPI_CC = icc
+endif
+
+ifeq ($(CC),gcc)
+	CCFLAGS = -O3 -DNDEBUG
+	DEBUGFLAGS = -Wall -g
+    PROFILEFLAGS = -g -pg -O3
+	LIBS = $(STATICFLAG) -lm -lgsl -lgslcblas 
+	FLIBS = $(STATICFLAG) $(LIBS)
+	KCC = $(CC)
+	KFLAGS = $(CCFLAGS)
+# environment variables that change openmpi's underlying C
+# compiler
+	OMPI_CC = gcc
+endif
+
+
+# debugging?
+
+ifdef DEBUG
+	CCFLAGS = $(DEBUGFLAGS)
+	FLAGFLAG = -DFLAGS=\"debugging\"
+else
+	DEBUG = "Off"
+endif
+
+ifdef PROFILE
+	CCFLAGS = $(PROFILEFLAGS)
+	FLAGFLAG = -DFLAGS=\"profiling\"
+	KCC = $(CC)
+	KFLAGS =
+else
+	PROFILE = "Off"
+endif
+
+ifdef USEPROFILE
+        CCFLAGS = $(USEPROFFLAGS)
+endif
+
+# export all variables that Makefiles in subdirs need
+
+export INCLUDES = -I. -I../lam -I/usr/local/include
+export CFLAGS = $(CCFLAGS) $(INCLUDES)
+export VFLAGS
+export CC
+export KCC
+export MPICC
+export FC = gfortran
+export CPP = g++
+export KFLAGS
+export LIBS
+export FLIBS
+export FORTLIBS
+export MPIFLAGS
+export FLYEXECS
+export MPI
+export OMPI_CC
+
+#define targets
+
+fly: lsa
+	@cd fly && $(MAKE)
+
+dynamicalsystems:
+	@cd fly && $(MAKE) dynamicalsystems
+
+deps: 
+	cd fly && $(MAKE) -f basic.mk Makefile
+
+lsa:
+	@cd lam && $(MAKE)
+
+clean:
+	rm -f core* *.o *.il
+	rm -f */core* */*.o */*.il 
+
+veryclean:
+	rm -f core* *.o *.il
+	rm -f */core* */*.o */*.il */*.slog */*.pout */*.uout
+	rm -f fly/automa fly/unfold fly/printscore fly/scramble
+	rm -f fly/newtonraphson fly/unstable-manifold fly/calculate_volumes
+	rm -f fly/fly_sa fly/fly_sa.mpi
+	rm -f lam/gen_deviates
+	rm -f fly/Makefile
+	rm -f fly/zygotic.cmp.c
+
+help:
+	@echo "make: this is the Makefile for fly code"
+	@echo "      always 'make deps' first after a 'make veryclean'"
+	@echo ""
+	@echo "      the following targets are available:"
+	@echo "      lsa:       make object files in the lam directory only"
+	@echo "      fly:       compile the fly code (which is in 'fly')"
+	@echo "      dynamicalsystems: compile the dynamical systems' "
+	@echo "             binaries newtonraphson, calculate_volumes,"
+	@echo "							unstable-manifold"
+	@echo "      clean:     gets rid of cores and object files"
+	@echo "      veryclean: gets rid of executables and dependencies too"
+	@echo "The following options (other than standard) are available:"
+	@echo "		 USEMPI: By default MPI use is determined by OS. Set this to 'no' to prevent building of parallel targets "
+	@echo "		 DOSTATIC: By default static targets are built depending on compiler. Set this to 'no' to force dynamic linking)"
+	@echo ""
+	@echo "      your current settings are:"   
+	@echo "      compiler:  $(CC)"
+	@echo "      MPI:  $(MPI)"
+	@echo "      MPI compiler (if any):  $(MPICC)"
+	@echo "      compile static targets or not:  $(DOSTATIC)"
+	@echo "      targets:  $(FLYEXECS)"
+	@echo "      flags:     $(CFLAGS)"
+	@echo "      debugging: $(DEBUG)"
+	@echo "      profiling: $(PROFILE)"
+	@echo ""
+
+

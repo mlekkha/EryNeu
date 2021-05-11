@@ -1,0 +1,156 @@
+#!/usr/bin/perl -w   # needed for the alphas
+################################################################
+# My name is HISTOGRAM_sorter 
+# Experimentally recreates probability density distributions.
+# A histogram is created by counting the number of occurances of samples in 
+# each bin of width step size.  The default step size is .1 but the user may
+# chose to input another step size via the command line.  
+# The lowest number determines the bin boundary.
+#
+# histogram_sorter (sort commented out 2-5-02) 
+# use the unix sort command before this script to sort the deviates (samples):
+################################################################################
+#    NOTE::::   alphas need n, dells need g 
+# sort -n dist_deviates > dist_deviates_sorted
+# need to change this to the -g option!!!!  
+# sort -g dist_deviates > dist_deviates_sorted
+# sort -n dist_deviates > dist_deviates_sorted
+#    open(IN, "<${ARGV[0]}_n_sorted") || die ("Could not open $ARGV[0]_n_sorted! (IN)\n");
+#    open(IN, "<${ARGV[0]}_g_sorted") || die ("Could not open $ARGV[0]_g_sorted! (IN)\n");
+# count the elements in the file
+#
+# OUTPUT:
+#   for every histogram bin:
+#   one line with number of occurrances, bin, normalized occurances to OUT
+#   No need to  direct output to a histogram file as in earlier versions.
+#############################################################################
+$filename="HISTOGRAM_sorter";
+$usage="USAGE: $filename file_to_sort histogram_output_file [step_size] \n";
+$step=.1;	#default step size
+$debug=0;	#set to 0 to turn off debugging, 1 turns on debugging
+if ($#ARGV==2){	#given step size on cmd line
+	$step=$ARGV[2];
+	}
+
+################################################################
+# next 2 lines needed if want to input UNSORTED file as ARGV[0]
+################################################################
+&sort_file;
+open(IN, "<${ARGV[0]}_g_sorted") || die ("Could not open $ARGV[0]_g_sorted! (IN)\n");
+
+######################################################################################### 
+# comment out above 2 lines and uncomment this open line when input file already sorted
+###############################################################################################
+#open(IN, "<$ARGV[0]") || die ("Could not open $ARGV[0]! (IN)\n");  # input file already sorted
+###############################################################################################
+
+open(OUT,">$ARGV[1]") || die ("Could not open $ARGV[1]! (OUT)\n");  # this is the histogram file
+
+if ($debug){ open(LOG,">$ARGV[1]_log") || die ("Could not open $ARGV[1]_log! (LOG)\n");
+ } # debug log file
+
+#set lower to a string, then we can check within our open loop
+$lower="NOT SET";
+
+#now to set our values based on the arg to set_vals
+sub set_vals{
+	$bin=$lower+($step/2.);  # want bin value to be center of bin range
+        $next=$lower+$step;        # next is upper bound of range
+	$histogram=0; #  the no. of occurances of all deviates in bin range
+	$num_temp= `wc -l $ARGV[0]`;	#get the number of deviates
+	chomp($num_temp);	#remove newline char
+	($num_of_dev = $num_temp) =~ s/(.*)(\s)($ARGV[0])/$1/ ; #strip garbage
+	if ($debug){
+		print LOG "\$lower : $lower\n";
+                print LOG "\$step \$next \$histogram \$bin  \$num_of_dev \n";
+	        print LOG "  $step    $next   $histogram  $bin   $num_of_dev \n";
+	}
+
+}
+sub sort_file{  # used only if in file is unsorted
+	`sort -g $ARGV[0] > ${ARGV[0]}_g_sorted`;
+	}
+	
+# select((select(OUT), $| = 1)[0]);	#flush buffer as read
+###################################################################
+#         ^^^^this didn't do anything because we never wrote to OUT 
+####################################################################
+
+
+
+while (<IN>){ # process sorted file 
+	if ($lower eq "NOT SET"){$lower=$_; &set_vals;} 
+
+
+	if ($debug){
+                    print  LOG "\$_ : $_  \$next : $next\n";
+                    select((select(LOG), $| = 1)[0]);	#flush buffer as read
+		} # debug print
+####################################################################################
+#  ^^^^ look at the numbers with this print... my magnitudes looked  screwy 
+###################################################################################
+
+	if ($_ > $next)
+               { # done with this bin for the histogram
+	if ($debug){
+                     print LOG "inside the if \$_ : $_ \$next : $next \n";
+                     select((select(LOG), $| = 1)[0]);	#flush buffer as read
+		   } # debug print
+    		$temp=($histogram)/($num_of_dev * $step);
+		print OUT "$histogram $bin  $temp \n";
+                select((select(OUT), $| = 1)[0]);	#flush buffer as read
+	if ($debug){
+		     print LOG  "$_ $next $histogram $bin  $temp \n";
+                     select((select(LOG), $| = 1)[0]);	#flush buffer as read
+		   } # debug print
+######################################################################################
+
+		 if ($_ > ($next + $step)) { #skip to that bin...
+		    $skip =  ($_ - $next);	
+	if ($debug){
+                    print LOG " elem minus next : $skip elem: $_  \$next : $next \n";
+                    select((select(LOG), $| = 1)[0]);      #flush buffer as read
+		   } # debug print
+	     	    $bin += $skip;
+ 		    $next += $skip;
+	if ($debug){
+                    print LOG "inwhile \$bin : $bin \$next : $next \n";
+                    select((select(LOG), $| = 1)[0]);      #flush buffer as read
+		    } # debug print
+		    } # if there is a gap bigger than the step size
+		 if ($_ <= ($next + $step)) { #little steps ok...
+	     	    $bin += $step;
+ 		    $next += $step;
+	if ($debug){
+                    print LOG "inwhile \$bin : $bin \$next : $next \n";
+                    select((select(LOG), $| = 1)[0]);      #flush buffer as read
+		    } # debug print
+		    } # little steps OK
+		$histogram=0;
+		}   # end of done with this bin for the histogram
+
+	$histogram+=1;
+	}  # end of while loop for processing sorted file
+
+print OUT "$histogram $bin  $temp \n";  # this print needed to flush last line 
+
+if ($debug){print LOG "$_ $next $histogram $bin  $temp \n";  # this print needed to flush last line 
+	   } # debug print
+###########################################################
+# added this manual FLUSH  
+############################################################
+
+
+close(IN);
+close(OUT);
+if ($debug){ close(LOG); } # debug log file
+
+
+
+
+
+
+
+
+
+
