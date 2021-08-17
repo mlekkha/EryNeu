@@ -63,3 +63,19 @@ make -e fly
 ### INPUT FILE FORMAT
 
 The 'examples' directory of this package includes examples of EryNeu input data files.
+
+### EXECUTIONS
+
+To infer the parameteres of the model, the parameters in the input file need to be first randomized with the help of the program `scramble`. 
+
+	scramble input -w file
+
+The scrambled input then (file) is used in the `fly_sa` program that can be executed in two modes, the serial (`fly_sa`) or parallel mode (`fly_sa.mpi`). The infered parameters will be stored in the same file as the input file.
+
+	fly_sa.mpi -t -s bs -a 0.001 -f 6 file
+
+`unfold` program is used run the model and estimate the gene expression trajectories from the initial conditions and the infered paramters.
+
+	unfold -a 0.001 -s bs -p 1 file
+    
+The infered gene trajectoris in Figure 1, 2, 3, and S2 were obtained using `unfold`.
