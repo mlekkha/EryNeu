@@ -74,7 +74,7 @@ The scrambled input then (file) is used in the `fly_sa` program that can be exec
 
 	fly_sa.mpi -t -s bs -a 0.001 -f 6 file
 
-`unfold` program is used run the model and estimate the gene expression trajectories from the initial conditions and the infered paramters.
+`unfold` program is used to run the model and estimate the gene expression trajectories from the initial conditions and the infered parameters.
 
 	unfold -a 0.001 -s bs -p 1 file
     
